@@ -3,36 +3,48 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
+use Illuminate\Support\Facades\Validator;
+use App\Helpers\ApiResponse; 
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Response;
 
 class AuthenticatedSessionController extends Controller
 {
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): Response
+    public function login(Request $request)
     {
-        $request->authenticate();
-
-        $request->session()->regenerate();
-
-        return response()->noContent();
+        $validator = Validator::make($request->all(),[
+            'email'=>['required','email','max:255'],
+            'password'=>['required',],
+            
+            
+        ]);
+        if ($validator->fails())
+        {
+            return ApiResponse::sendResponse(422,'Login Validation Errors', $validator->errors());
+        }
+        if (Auth::guard('user')->attempt(['email' => $request->email, 'password' => $request->password])) {
+            $currentUser = Auth::guard('user')->user();
+            $token = $currentUser->createToken('user')->plainTextToken;
+            return ApiResponse::sendResponse(200, 'User Logged In Successfully', ['token' => $token]);
+        
+        } else {
+            // Return invalid credentials message
+            return ApiResponse::sendResponse(401, 'Invalid credentials', null);
+        }
     }
-
     /**
-     * Destroy an authenticated session.
+     * Logout
      */
-    public function destroy(Request $request): Response
+    public function logout(Request $request)
     {
-        Auth::guard('web')->logout();
-
-        $request->session()->invalidate();
-
-        $request->session()->regenerateToken();
-
-        return response()->noContent();
-    }
+        $request->user()->currentAccessToken()->delete();
+        
+        return ApiResponse::sendResponse(200,'User Logged Out Successfully', []);
+    
+       
+}
 }
